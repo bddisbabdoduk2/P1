@@ -1,0 +1,32 @@
+import "server-only";
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
+import { configured } from "@/lib/config";
+export async function supabase() {
+  if (!configured) return null;
+  const store = await cookies();
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    {
+      cookies: {
+        getAll: () => store.getAll(),
+        setAll(items) {
+          try {
+            items.forEach(({ name, value, options }) =>
+              store.set(name, value, options),
+            );
+          } catch {
+            /* Server Components cannot write cookies; proxy handles refresh. */
+          }
+        },
+      },
+    },
+  );
+}
+export async function currentUser() {
+  const db = await supabase();
+  if (!db) return null;
+  const { data, error } = await db.auth.getUser();
+  return error ? null : data.user;
+}
